@@ -61,7 +61,7 @@ Release con una etiqueta `vX.Y`: GitHub Actions compila el APK firmado y lo adju
 | Consumo | Energía / distancia × 100 (kWh/100 km) |
 | Coste | Energía × precio €/kWh configurado |
 
-Capacidad útil por defecto: 57,5 kWh (Propulsión trasera LFP, 60 kWh brutos). Para Gran Autonomía / Performance usa 75 kWh.
+Capacidad útil por defecto: 60 kWh (Propulsión trasera LFP 2026: 63 kWh brutos, 60 kWh netos). Para Gran Autonomía / Performance usa 75 kWh.
 
 ### Degradación de la batería (pestaña Batería)
 
@@ -126,7 +126,7 @@ Copia `MisRutasEV.apk` al móvil y ábrelo. MagicOS pedirá permitir *instalar a
 6. **Bluetooth:** concede permisos, elige el Bluetooth de tu Tesla, quita la restricción de batería y, en MagicOS:
    *Ajustes › Batería › Inicio de aplicaciones › Mis Rutas EV* → desactiva *Gestionar automáticamente* y activa
    *Inicio automático*, *Inicio secundario* y *Ejecutar en segundo plano*. Sin esto MagicOS puede cerrar la app y perder rutas.
-7. **Cálculos:** capacidad de fábrica de tu batería (57,5 kWh para la LFP de 60 kWh), autonomía de fábrica al 100 % (opcional) y precio de la luz.
+7. **Cálculos:** capacidad de fábrica de tu batería (60 kWh netos para la LFP 2026 de 63 kWh brutos), autonomía de fábrica al 100 % (opcional) y precio de la luz.
 
 ---
 

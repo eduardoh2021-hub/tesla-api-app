@@ -14,7 +14,7 @@ android {
         targetSdk = 36
         // En GitHub Actions cada ejecución sube el número de versión para que el APK se pueda actualizar encima.
         versionCode = (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0) + 1
-        versionName = System.getenv("VERSION_NAME")?.removePrefix("v")?.ifBlank { null } ?: "1.1"
+        versionName = System.getenv("VERSION_NAME")?.removePrefix("v")?.ifBlank { null } ?: "1.2"
         // Repositorio del que la app descarga las actualizaciones (sus Releases).
         val repo = System.getenv("GITHUB_REPOSITORY") ?: "eduardoh2021-hub/tesla-api-app"
         buildConfigField("String", "UPDATE_REPO", "\"$repo\"")

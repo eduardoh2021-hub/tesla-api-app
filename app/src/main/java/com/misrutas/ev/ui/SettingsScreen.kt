@@ -66,6 +66,8 @@ import com.misrutas.ev.BuildConfig
 import com.misrutas.ev.trip.Backup
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.foundation.layout.size
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -79,8 +81,9 @@ fun SettingsScreen(pendingAuth: Uri?, onAuthHandled: () -> Unit) {
     val scope = rememberCoroutineScope()
 
     var refresh by remember { mutableIntStateOf(0) }
-    var busy by remember { mutableStateOf(false) }
-    var message by remember { mutableStateOf<String?>(null) }
+    // Cada tarjeta muestra su propio resultado y su indicador de progreso justo debajo de sus controles.
+    var busyCard by remember { mutableStateOf<String?>(null) }
+    val messages = remember { mutableStateMapOf<String, String>() }
 
     var region by remember { mutableStateOf(prefs.region) }
     var clientId by remember { mutableStateOf(prefs.clientId) }
@@ -100,17 +103,21 @@ fun SettingsScreen(pendingAuth: Uri?, onAuthHandled: () -> Unit) {
     var downloadProgress by remember { mutableStateOf<Float?>(null) }
     val dbTick by Db.version.collectAsState()
 
-    fun launchTask(action: suspend () -> String) {
-        if (busy) return
-        busy = true
-        message = null
+    fun say(card: String, text: String) {
+        messages[card] = text
+    }
+
+    fun launchTask(card: String, action: suspend () -> String) {
+        if (busyCard != null) return
+        busyCard = card
+        messages.remove(card)
         scope.launch {
-            message = try {
+            messages[card] = try {
                 action()
             } catch (e: Exception) {
                 "⚠ ${e.message}"
             }
-            busy = false
+            busyCard = null
             refresh++
         }
     }
@@ -136,7 +143,7 @@ fun SettingsScreen(pendingAuth: Uri?, onAuthHandled: () -> Unit) {
     LaunchedEffect(pendingAuth) {
         val uri = pendingAuth ?: return@LaunchedEffect
         onAuthHandled()
-        launchTask {
+        launchTask("login") {
             client.handleRedirect(uri)
             "Sesión iniciada ✓  " + loadVehicles()
         }
@@ -144,7 +151,7 @@ fun SettingsScreen(pendingAuth: Uri?, onAuthHandled: () -> Unit) {
 
     val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { refresh++ }
     val csvLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
-        if (uri != null) launchTask { "Exportadas ${withContext(Dispatchers.IO) { Csv.exportTrips(ctx, uri) }} rutas" }
+        if (uri != null) launchTask("data") { "Exportadas ${withContext(Dispatchers.IO) { Csv.exportTrips(ctx, uri) }} rutas" }
     }
 
     // Al volver de los ajustes del sistema se releen permisos y restricción de batería.
@@ -161,10 +168,6 @@ fun SettingsScreen(pendingAuth: Uri?, onAuthHandled: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text("Ajustes", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
-        if (busy) CircularProgressIndicator()
-        message?.let {
-            Text(it, color = if (it.startsWith("⚠")) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
-        }
 
         SectionCard("1 · App de desarrollador de Tesla") {
             Hint("Crea la app en developer.tesla.com y copia aquí sus datos. La guía del proyecto explica cada campo.")
@@ -181,7 +184,8 @@ fun SettingsScreen(pendingAuth: Uri?, onAuthHandled: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
             )
             Field("Dominio (p. ej. usuario.github.io)", domain) { domain = it }
-            Button(onClick = { saveApp(); message = "Datos guardados" }, Modifier.padding(top = 8.dp)) { Text("Guardar") }
+            Button(onClick = { saveApp(); say("app", "Datos guardados") }, Modifier.padding(top = 8.dp)) { Text("Guardar") }
+            CardStatus(busyCard == "app", messages["app"])
             if (prefs.domain.isNotBlank()) {
                 Hint("En developer.tesla.com usa:\n• Allowed Origin: https://${prefs.domain}\n• Allowed Redirect URI: ${client.redirectUri()}")
             }
@@ -195,10 +199,10 @@ fun SettingsScreen(pendingAuth: Uri?, onAuthHandled: () -> Unit) {
                     Text(pem, fontFamily = FontFamily.Monospace, fontSize = 11.sp, modifier = Modifier.padding(vertical = 8.dp))
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { copy(ctx, pem); message = "Clave copiada" }) { Text("Copiar") }
+                    OutlinedButton(onClick = { copy(ctx, pem); say("key", "Clave copiada") }) { Text("Copiar") }
                     OutlinedButton(onClick = { share(ctx, pem) }) { Text("Compartir") }
                     OutlinedButton(onClick = {
-                        launchTask {
+                        launchTask("key") {
                             val published = client.fetchPublishedKey()
                             if (KeyGen.samePem(published, pem)) "✓ La clave publicada coincide" else "⚠ La clave publicada no coincide con esta"
                         }
@@ -212,15 +216,17 @@ fun SettingsScreen(pendingAuth: Uri?, onAuthHandled: () -> Unit) {
                     refresh++
                 }, Modifier.padding(top = 8.dp)) { Text("Generar clave") }
             }
+            CardStatus(busyCard == "key", messages["key"])
         }
 
         SectionCard("3 · Registro en la región") {
             Hint("Se hace una sola vez, después de publicar la clave. Registra tu dominio en la Fleet API de la región elegida.")
             Button(
-                onClick = { saveApp(); launchTask { client.registerPartner() } },
+                onClick = { saveApp(); launchTask("partner") { client.registerPartner() } },
                 enabled = clientId.isNotBlank() && clientSecret.isNotBlank() && domain.isNotBlank(),
                 modifier = Modifier.padding(top = 8.dp),
             ) { Text("Registrar") }
+            CardStatus(busyCard == "partner", messages["partner"])
         }
 
         SectionCard("4 · Iniciar sesión con tu cuenta Tesla") {
@@ -248,10 +254,11 @@ fun SettingsScreen(pendingAuth: Uri?, onAuthHandled: () -> Unit) {
                     val text = pastedUrl.trim()
                     val uri = if (text.contains("code=")) Uri.parse(text) else Uri.parse("misrutasev://auth?code=" + Uri.encode(text))
                     pastedUrl = ""
-                    launchTask { client.handleRedirect(uri); "Sesión iniciada ✓  " + loadVehicles() }
+                    launchTask("login") { client.handleRedirect(uri); "Sesión iniciada ✓  " + loadVehicles() }
                 },
                 enabled = pastedUrl.isNotBlank(),
             ) { Text("Usar") }
+            CardStatus(busyCard == "login", messages["login"])
         }
 
         SectionCard("5 · Vehículo") {
@@ -265,9 +272,9 @@ fun SettingsScreen(pendingAuth: Uri?, onAuthHandled: () -> Unit) {
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
-                OutlinedButton(onClick = { launchTask { loadVehicles() } }, enabled = prefs.isLoggedIn) { Text("Cargar vehículos") }
+                OutlinedButton(onClick = { launchTask("vehicle") { loadVehicles() } }, enabled = prefs.isLoggedIn) { Text("Cargar vehículos") }
                 OutlinedButton(onClick = {
-                    launchTask {
+                    launchTask("vehicle") {
                         val s = client.vehicleData()
                         // Una lectura manual justo después de cargar al 100 % también alimenta la estimación de batería.
                         withContext(Dispatchers.IO) { BatteryLog(ctx).observe(s) }
@@ -276,6 +283,7 @@ fun SettingsScreen(pendingAuth: Uri?, onAuthHandled: () -> Unit) {
                     }
                 }, enabled = prefs.isConfigured) { Text("Probar lectura") }
             }
+            CardStatus(busyCard == "vehicle", messages["vehicle"])
             Hint("Si el coche duerme, la lectura falla (no se despierta para no gastar). Pruébalo con el coche despierto.")
         }
 
@@ -308,9 +316,9 @@ fun SettingsScreen(pendingAuth: Uri?, onAuthHandled: () -> Unit) {
         }
 
         SectionCard("7 · Cálculos") {
-            Hint("Capacidad útil de fábrica: Propulsión trasera LFP 60 kWh brutos ≈ 57,5 kWh útiles; Gran Autonomía/Performance ≈ 75 kWh.")
+            Hint("Capacidad útil (neta) de fábrica: Propulsión trasera LFP 2026 = 63 kWh brutos, 60 kWh netos; Gran Autonomía/Performance ≈ 75 kWh.")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { battery = "57,5" }) { Text("LFP 57,5 kWh") }
+                OutlinedButton(onClick = { battery = "60,0" }) { Text("LFP 60 kWh") }
                 OutlinedButton(onClick = { battery = "75,0" }) { Text("75 kWh") }
             }
             NumberField("Capacidad útil de fábrica (kWh)", battery) { battery = it }
@@ -325,8 +333,9 @@ fun SettingsScreen(pendingAuth: Uri?, onAuthHandled: () -> Unit) {
                 price.toFloatOrNullEs()?.let { prefs.pricePerKwh = it }
                 poll.toIntOrNull()?.let { prefs.pollSeconds = it }
                 poll = prefs.pollSeconds.toString()
-                message = "Parámetros guardados"
+                say("calc", "Parámetros guardados")
             }, Modifier.padding(top = 8.dp)) { Text("Guardar parámetros") }
+            CardStatus(busyCard == "calc", messages["calc"])
         }
 
         SectionCard("8 · Modo respaldo") {
@@ -351,10 +360,11 @@ fun SettingsScreen(pendingAuth: Uri?, onAuthHandled: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
             )
             OutlinedButton(
-                onClick = { Backup.checkNow(ctx); message = "Comprobando… el resultado aparecerá aquí en unos segundos" },
+                onClick = { Backup.checkNow(ctx); say("backup", "Comprobando… el resultado aparecerá arriba en unos segundos") },
                 enabled = prefs.isConfigured,
                 modifier = Modifier.padding(top = 8.dp),
             ) { Text("Comprobar ahora") }
+            CardStatus(busyCard == "backup", messages["backup"])
         }
 
         SectionCard("9 · Actualizaciones") {
@@ -369,13 +379,13 @@ fun SettingsScreen(pendingAuth: Uri?, onAuthHandled: () -> Unit) {
                 }
                 Button(onClick = {
                     if (!ctx.packageManager.canRequestPackageInstalls()) {
-                        message = "Permite a Mis Rutas EV instalar apps y vuelve a pulsar"
+                        say("update", "Permite a Mis Rutas EV instalar apps y vuelve a pulsar")
                         ctx.startActivity(
                             Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${ctx.packageName}"))
                         )
                         return@Button
                     }
-                    launchTask {
+                    launchTask("update") {
                         downloadProgress = 0f
                         try {
                             Updater.downloadAndInstall(ctx, rel) { p -> downloadProgress = p }
@@ -387,7 +397,7 @@ fun SettingsScreen(pendingAuth: Uri?, onAuthHandled: () -> Unit) {
                 }, enabled = downloadProgress == null, modifier = Modifier.padding(top = 8.dp)) { Text("Descargar e instalar") }
             }
             OutlinedButton(onClick = {
-                launchTask {
+                launchTask("update") {
                     val r = Updater.latest()
                     release = r
                     when {
@@ -397,6 +407,7 @@ fun SettingsScreen(pendingAuth: Uri?, onAuthHandled: () -> Unit) {
                     }
                 }
             }, modifier = Modifier.padding(top = 8.dp)) { Text("Buscar actualización") }
+            CardStatus(busyCard == "update", messages["update"])
         }
 
         SectionCard("Datos") {
@@ -404,6 +415,7 @@ fun SettingsScreen(pendingAuth: Uri?, onAuthHandled: () -> Unit) {
                 OutlinedButton(onClick = { csvLauncher.launch("rutas.csv") }) { Text("Exportar CSV") }
                 OutlinedButton(onClick = { confirmWipe = true }) { Text("Borrar todas las rutas") }
             }
+            CardStatus(busyCard == "data", messages["data"])
         }
     }
 
@@ -443,10 +455,27 @@ fun SettingsScreen(pendingAuth: Uri?, onAuthHandled: () -> Unit) {
             confirmButton = {
                 TextButton(onClick = {
                     confirmWipe = false
-                    launchTask { withContext(Dispatchers.IO) { Db.get(ctx).deleteAll() }; "Historial borrado" }
+                    launchTask("data") { withContext(Dispatchers.IO) { Db.get(ctx).deleteAll() }; "Historial borrado" }
                 }) { Text("Borrar") }
             },
             dismissButton = { TextButton(onClick = { confirmWipe = false }) { Text("Cancelar") } },
+        )
+    }
+}
+
+/** Resultado de la última acción de una tarjeta, mostrado al final de esa misma tarjeta. */
+@Composable
+private fun CardStatus(busy: Boolean, message: String?) {
+    if (busy) {
+        CircularProgressIndicator(Modifier.padding(top = 10.dp).size(24.dp), strokeWidth = 3.dp)
+    }
+    if (message != null) {
+        val error = message.startsWith("⚠")
+        Text(
+            message,
+            color = if (error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(top = 8.dp),
         )
     }
 }

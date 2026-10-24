@@ -87,9 +87,9 @@ class Prefs(ctx: Context) {
         get() = sp.getInt("poll_seconds", 60)
         set(v) = sp.edit { putInt("poll_seconds", v.coerceIn(20, 600)) }
 
-    /** Capacidad útil de fábrica de la batería en kWh (LFP 60 kWh brutos ≈ 57,5 útiles). */
+    /** Capacidad útil de fábrica de la batería en kWh (Model 3 LFP 2026: 63 kWh brutos, 60 netos). */
     var batteryKwh: Float
-        get() = sp.getFloat("battery_kwh", 57.5f)
+        get() = sp.getFloat("battery_kwh", 60f).let { if (it == LEGACY_LFP_KWH) 60f else it }
         set(v) = sp.edit { putFloat("battery_kwh", v) }
 
     /** Autonomía homologada al 100 % con la batería nueva; 0 = se toma la mayor observada. */
@@ -175,6 +175,9 @@ class Prefs(ctx: Context) {
     companion object {
         const val BASE_EU = "https://fleet-api.prd.eu.vn.cloud.tesla.com"
         const val BASE_NA = "https://fleet-api.prd.na.vn.cloud.tesla.com"
+
+        /** Valor por defecto erróneo de la v1.1; quien lo tenga guardado pasa a los 60 kWh netos correctos. */
+        private const val LEGACY_LFP_KWH = 57.5f
     }
 }
 

@@ -40,6 +40,7 @@ import com.misrutas.ev.data.Trip
 import com.misrutas.ev.trip.TripRecorder
 import com.misrutas.ev.trip.TripService
 import com.misrutas.ev.util.Fmt
+import com.misrutas.ev.util.MapsLink
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -148,14 +149,11 @@ fun TripDetailScreen(id: Long, onBack: () -> Unit) {
         }
 
         Row(Modifier.fillMaxWidth().padding(vertical = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (t.startLat != null && t.endLat != null) {
+            if (t.startLat != null && t.startLon != null && t.endLat != null && t.endLon != null) {
                 OutlinedButton(onClick = {
-                    val u = Uri.parse(
-                        "https://www.google.com/maps/dir/?api=1&origin=${t.startLat},${t.startLon}" +
-                            "&destination=${t.endLat},${t.endLon}&travelmode=driving"
-                    )
-                    ctx.startActivity(Intent(Intent.ACTION_VIEW, u))
-                }) { Text("Mapa") }
+                    // Solo los puntos en marcha: los aparcados repiten origen o destino.
+                    MapsLink.open(ctx, samples.filter { it.isDriving }, t.startLat, t.startLon, t.endLat, t.endLon)
+                }) { Text("Ver mapa") }
             }
             OutlinedButton(onClick = { editNote = true }) { Text("Nota") }
             OutlinedButton(onClick = { confirmDelete = true }) { Text("Eliminar") }
