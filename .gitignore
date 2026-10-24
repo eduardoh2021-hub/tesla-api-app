@@ -1,0 +1,14 @@
+# Rutas locales del SDK y datos de la máquina: nunca se suben
+local.properties
+*.keystore
+*.jks
+*.pem
+.gradle/
+.kotlin/
+build/
+app/build/
+captures/
+.idea/
+*.iml
+.DS_Store
+*.apk

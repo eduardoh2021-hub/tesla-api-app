@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Volver a Mis Rutas EV</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 34rem; margin: 3rem auto; padding: 0 1rem; line-height: 1.5; }
+  a.btn { display: inline-block; background: #1b2a41; color: #fff; padding: .8rem 1.4rem; border-radius: .6rem; text-decoration: none; }
+  code { word-break: break-all; background: #f1f1f1; padding: .2rem .3rem; border-radius: .3rem; font-size: .8rem; }
+</style>
+</head>
+<body>
+<h1>Volviendo a la app…</h1>
+<p>Si la app no se abre sola, pulsa el botón:</p>
+<p><a class="btn" id="open" href="#">Abrir Mis Rutas EV</a></p>
+<p>Si tampoco funciona, copia esta dirección completa y pégala en <b>Ajustes › 4 · URL de retorno</b>:</p>
+<p><code id="url"></code></p>
+<script>
+  // Reenvía el código de autorización de Tesla a la app instalada (esquema misrutasev://).
+  var query = location.search;
+  var app = "intent://auth" + query + "#Intent;scheme=misrutasev;package=com.misrutas.ev;end";
+  document.getElementById("open").href = app;
+  document.getElementById("url").textContent = location.href;
+  if (/Android/i.test(navigator.userAgent) && query.indexOf("code=") >= 0) location.replace(app);
+</script>
+</body>
+</html>
