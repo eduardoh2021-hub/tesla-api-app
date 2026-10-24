@@ -12,8 +12,23 @@ android {
         applicationId = "com.misrutas.ev"
         minSdk = 33
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        // En GitHub Actions cada ejecución sube el número de versión para que el APK se pueda actualizar encima.
+        versionCode = (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0) + 1
+        versionName = System.getenv("VERSION_NAME")?.removePrefix("v")?.ifBlank { null } ?: "1.0"
+    }
+
+    // La clave de firma nunca está en el repositorio: llega por variables de entorno
+    // (secrets de GitHub Actions o la consola local). Sin ellas se firma con la clave de depuración.
+    val releaseKeystore = System.getenv("SIGNING_KEYSTORE_PATH")?.let { file(it) }?.takeIf { it.exists() }
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = System.getenv("SIGNING_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("SIGNING_KEY_ALIAS")
+                keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
@@ -21,8 +36,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
-            // Firmado con la clave de depuración para poder instalarlo directamente (uso personal).
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
 

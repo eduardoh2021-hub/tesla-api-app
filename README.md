@@ -83,7 +83,8 @@ La clave pública es pública por diseño; la privada nunca sale del móvil.
 ### B. App de desarrollador en Tesla
 
 1. Entra en <https://developer.tesla.com> con tu cuenta Tesla (exige verificación en dos pasos).
-2. *Create application*: nombre único (p. ej. "rutas-TU_USUARIO"), descripción y propósito: uso personal para registrar mis rutas.
+2. *Create application*: nombre único **solo con letras y números, sin espacios, sin acentos y sin la palabra "Tesla"**
+   (p. ej. `MisRutasTuNombre2026`); si da "nombre no válido", prueba otro. Descripción y propósito: uso personal para registrar mis rutas.
 3. **OAuth Grant Type:** *Authorization Code and Machine-to-Machine*.
 4. **Allowed Origin(s):** `https://TU_USUARIO.github.io`
 5. **Allowed Redirect URI(s):** `https://TU_USUARIO.github.io/callback.html`
