@@ -5,6 +5,7 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import androidx.core.content.edit
+import org.json.JSONObject
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -105,6 +106,56 @@ class Prefs(ctx: Context) {
         get() = sp.getFloat("last_seen_energy_added", -1f)
         set(v) = sp.edit { putFloat("last_seen_energy_added", v) }
 
+    /** Última lectura completa conocida del coche (base del modo respaldo para detectar km sin registrar). */
+    var lastSeen: Snapshot?
+        get() = sp.getString("last_seen_snapshot", null)?.let { s ->
+            runCatching {
+                val o = JSONObject(s)
+                Snapshot(
+                    ts = o.getLong("ts"),
+                    odometerKm = o.getDouble("odo"),
+                    soc = o.getInt("soc"),
+                    ratedRangeKm = o.optNum("range"),
+                    speedKmh = null,
+                    shift = null,
+                    lat = o.optNum("lat"),
+                    lon = o.optNum("lon"),
+                    powerKw = null,
+                    outsideTemp = o.optNum("temp"),
+                    chargingState = null,
+                    chargeEnergyAdded = o.optNum("added"),
+                )
+            }.getOrNull()
+        }
+        set(v) = sp.edit {
+            if (v == null) {
+                remove("last_seen_snapshot")
+            } else {
+                val o = JSONObject()
+                    .put("ts", v.ts).put("odo", v.odometerKm).put("soc", v.soc)
+                    .put("range", v.ratedRangeKm).put("lat", v.lat).put("lon", v.lon)
+                    .put("temp", v.outsideTemp).put("added", v.chargeEnergyAdded)
+                putString("last_seen_snapshot", o.toString())
+            }
+        }
+
+    /** Momento de la última conexión Bluetooth al coche (o sesión de registro). */
+    var lastConnectTs: Long
+        get() = sp.getLong("last_connect_ts", 0)
+        set(v) = sp.edit { putLong("last_connect_ts", v) }
+
+    var backupMode: Boolean
+        get() = sp.getBoolean("backup_mode", true)
+        set(v) = sp.edit { putBoolean("backup_mode", v) }
+
+    var lastBackupCheckTs: Long
+        get() = sp.getLong("last_backup_check_ts", 0)
+        set(v) = sp.edit { putLong("last_backup_check_ts", v) }
+
+    var lastBackupResult: String?
+        get() = sp.getString("last_backup_result", null)
+        set(v) = sp.edit { putString("last_backup_result", v) }
+
     /** Precio de la electricidad en €/kWh, para estimar el coste de cada ruta. */
     var pricePerKwh: Float
         get() = sp.getFloat("price_kwh", 0.15f)
@@ -112,6 +163,8 @@ class Prefs(ctx: Context) {
 
     val isLoggedIn get() = refreshToken != null
     val isConfigured get() = isLoggedIn && vin != null
+
+    private fun JSONObject.optNum(k: String): Double? = if (has(k) && !isNull(k)) getDouble(k) else null
 
     private fun secret(key: String): String? = sp.getString(key, null)?.let { SecretBox.decrypt(it) }
 

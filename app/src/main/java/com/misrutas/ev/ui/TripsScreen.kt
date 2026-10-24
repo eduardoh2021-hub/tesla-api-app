@@ -128,7 +128,11 @@ private fun TripRow(t: Trip, price: Double, onClick: () -> Unit) {
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "${Fmt.time(t.startTs)} – ${if (t.recording) "en curso" else Fmt.time(t.endTs)}",
+                    when {
+                        !t.detailed -> "Sin detalle · hasta ${Fmt.dateTime(t.endTs)}"
+                        t.recording -> "${Fmt.time(t.startTs)} – en curso"
+                        else -> "${Fmt.time(t.startTs)} – ${Fmt.time(t.endTs)}"
+                    },
                     style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.weight(1f),
                 )
@@ -148,8 +152,10 @@ private fun TripRow(t: Trip, price: Double, onClick: () -> Unit) {
             if (!t.recording) {
                 Row(Modifier.padding(top = 6.dp)) {
                     Chip(Fmt.km(t.distanceKm))
-                    Chip("${t.avgSpeed.toInt()} km/h")
-                    Chip(Fmt.duration(t.endTs - t.startTs))
+                    if (t.detailed) {
+                        Chip("${t.avgSpeed.toInt()} km/h")
+                        Chip(Fmt.duration(t.endTs - t.startTs))
+                    }
                     Chip(Fmt.eur(t.energyKwh.coerceAtLeast(0.0) * price))
                 }
             }

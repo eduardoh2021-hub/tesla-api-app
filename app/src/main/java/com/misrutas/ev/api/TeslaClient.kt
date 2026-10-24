@@ -172,14 +172,30 @@ class TeslaClient private constructor(ctx: Context) {
         return parseSnapshot(o.getJSONObject("response"))
     }
 
+    /**
+     * Última lectura que el coche envió a Tesla, sin contactar con él (nunca lo despierta).
+     * Puede tener horas de antigüedad y no incluye la posición. Si no hay caché se intenta una lectura normal.
+     */
+    suspend fun vehicleDataCachedOrLive(): Snapshot {
+        val vin = prefs.vin ?: throw TeslaException("Elige tu vehículo en Ajustes")
+        return try {
+            parseSnapshot(get("/api/1/vehicles/$vin/vehicle_data_cached").getJSONObject("response"))
+        } catch (e: TeslaException) {
+            if (e is VehicleUnavailable) throw e
+            vehicleData()
+        }
+    }
+
     private fun parseSnapshot(r: JSONObject): Snapshot {
         val ds = r.optJSONObject("drive_state") ?: JSONObject()
         val cs = r.optJSONObject("charge_state") ?: JSONObject()
         val vs = r.optJSONObject("vehicle_state") ?: JSONObject()
         val cl = r.optJSONObject("climate_state") ?: JSONObject()
         val odo = vs.num("odometer") ?: throw TeslaException("La respuesta no incluye el cuentakilómetros")
+        val now = System.currentTimeMillis()
         return Snapshot(
-            ts = System.currentTimeMillis(),
+            // Hora real de la lectura en el coche (importa en la caché, que puede ser antigua).
+            ts = vs.num("timestamp")?.toLong()?.takeIf { it in 1..now } ?: now,
             odometerKm = odo * MI_TO_KM,
             soc = cs.num("battery_level")?.toInt() ?: 0,
             ratedRangeKm = cs.num("battery_range")?.times(MI_TO_KM),

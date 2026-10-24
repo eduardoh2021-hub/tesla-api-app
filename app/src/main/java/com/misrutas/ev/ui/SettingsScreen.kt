@@ -61,6 +61,11 @@ import com.misrutas.ev.data.VehicleInfo
 import com.misrutas.ev.trip.BatteryLog
 import com.misrutas.ev.util.Csv
 import com.misrutas.ev.util.Fmt
+import com.misrutas.ev.util.Updater
+import com.misrutas.ev.BuildConfig
+import com.misrutas.ev.trip.Backup
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.runtime.collectAsState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -91,6 +96,9 @@ fun SettingsScreen(pendingAuth: Uri?, onAuthHandled: () -> Unit) {
     }
     var showDevices by remember { mutableStateOf(false) }
     var confirmWipe by remember { mutableStateOf(false) }
+    var release by remember { mutableStateOf<Updater.Release?>(null) }
+    var downloadProgress by remember { mutableStateOf<Float?>(null) }
+    val dbTick by Db.version.collectAsState()
 
     fun launchTask(action: suspend () -> String) {
         if (busy) return
@@ -319,6 +327,76 @@ fun SettingsScreen(pendingAuth: Uri?, onAuthHandled: () -> Unit) {
                 poll = prefs.pollSeconds.toString()
                 message = "Parámetros guardados"
             }, Modifier.padding(top = 8.dp)) { Text("Guardar parámetros") }
+        }
+
+        SectionCard("8 · Modo respaldo") {
+            Hint(
+                "Una vez al día, si en las últimas 24 h no ha habido conexión por Bluetooth, la app consulta el " +
+                    "cuentakilómetros (sin despertar el coche). Si ha avanzado, guarda una ruta no detallada con los km y el consumo. " +
+                    "También rellena los huecos al empezar cada sesión."
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Comprobación diaria", Modifier.weight(1f))
+                Switch(checked = prefs.backupMode, onCheckedChange = {
+                    prefs.backupMode = it
+                    Backup.schedule(ctx)
+                    refresh++
+                })
+            }
+            // Se relee cuando la comprobación en segundo plano termina (incrementa Db.version).
+            val lastCheck = dbTick.let { prefs.lastBackupCheckTs }
+            Text(
+                if (lastCheck > 0) "Última comprobación: ${Fmt.dateTime(lastCheck)} · ${prefs.lastBackupResult.orEmpty()}"
+                else "Todavía no se ha hecho ninguna comprobación",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            OutlinedButton(
+                onClick = { Backup.checkNow(ctx); message = "Comprobando… el resultado aparecerá aquí en unos segundos" },
+                enabled = prefs.isConfigured,
+                modifier = Modifier.padding(top = 8.dp),
+            ) { Text("Comprobar ahora") }
+        }
+
+        SectionCard("9 · Actualizaciones") {
+            Text("Versión instalada: ${Updater.currentVersion}", Modifier.padding(top = 6.dp))
+            Hint("Busca la última versión publicada en Releases del repositorio ${BuildConfig.UPDATE_REPO}.")
+            val rel = release
+            if (rel != null && Updater.isNewer(rel.tag)) {
+                Text("Disponible: ${rel.tag}", color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 6.dp))
+                if (rel.notes.isNotBlank()) Hint(rel.notes.take(400))
+                downloadProgress?.let {
+                    LinearProgressIndicator(progress = { it }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+                }
+                Button(onClick = {
+                    if (!ctx.packageManager.canRequestPackageInstalls()) {
+                        message = "Permite a Mis Rutas EV instalar apps y vuelve a pulsar"
+                        ctx.startActivity(
+                            Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${ctx.packageName}"))
+                        )
+                        return@Button
+                    }
+                    launchTask {
+                        downloadProgress = 0f
+                        try {
+                            Updater.downloadAndInstall(ctx, rel) { p -> downloadProgress = p }
+                        } finally {
+                            downloadProgress = null
+                        }
+                        "Descargada ${rel.tag}: confirma la instalación"
+                    }
+                }, enabled = downloadProgress == null, modifier = Modifier.padding(top = 8.dp)) { Text("Descargar e instalar") }
+            }
+            OutlinedButton(onClick = {
+                launchTask {
+                    val r = Updater.latest()
+                    release = r
+                    when {
+                        r == null -> "No hay ninguna versión publicada en Releases"
+                        Updater.isNewer(r.tag) -> "Hay una versión nueva: ${r.tag}"
+                        else -> "Ya tienes la última versión (${r.tag})"
+                    }
+                }
+            }, modifier = Modifier.padding(top = 8.dp)) { Text("Buscar actualización") }
         }
 
         SectionCard("Datos") {

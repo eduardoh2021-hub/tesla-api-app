@@ -8,7 +8,7 @@ import android.database.sqlite.SQLiteOpenHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 
-class Db private constructor(ctx: Context) : SQLiteOpenHelper(ctx, "rutas.db", null, 2) {
+class Db private constructor(ctx: Context) : SQLiteOpenHelper(ctx, "rutas.db", null, 3) {
 
     companion object {
         @Volatile private var inst: Db? = null
@@ -33,7 +33,8 @@ class Db private constructor(ctx: Context) : SQLiteOpenHelper(ctx, "rutas.db", n
                 max_speed REAL NOT NULL DEFAULT 0,
                 avg_temp REAL,
                 start_lat REAL, start_lon REAL, end_lat REAL, end_lon REAL,
-                start_addr TEXT, end_addr TEXT, note TEXT)"""
+                start_addr TEXT, end_addr TEXT, note TEXT,
+                source TEXT NOT NULL DEFAULT 'live')"""
         )
         db.execSQL(
             """CREATE TABLE samples(
@@ -51,6 +52,29 @@ class Db private constructor(ctx: Context) : SQLiteOpenHelper(ctx, "rutas.db", n
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) createBatteryTable(db)
+        if (oldVersion < 3) db.execSQL("ALTER TABLE trips ADD COLUMN source TEXT NOT NULL DEFAULT 'live'")
+    }
+
+    /** Ruta deducida por el modo respaldo a partir de dos lecturas del cuentakilómetros. */
+    fun insertBackupTrip(from: Snapshot, to: Snapshot, distanceKm: Double, energyKwh: Double, note: String) {
+        val cv = ContentValues().apply {
+            put("status", Trip.STATUS_DONE)
+            put("source", Trip.SOURCE_BACKUP)
+            put("start_ts", from.ts)
+            put("end_ts", to.ts)
+            put("distance_km", distanceKm)
+            put("energy_kwh", energyKwh)
+            put("start_soc", from.soc)
+            put("end_soc", to.soc)
+            put("avg_temp", to.outsideTemp)
+            put("start_lat", from.lat)
+            put("start_lon", from.lon)
+            put("end_lat", to.lat)
+            put("end_lon", to.lon)
+            put("note", note)
+        }
+        writableDatabase.insert("trips", null, cv)
+        changed()
     }
 
     private fun createBatteryTable(db: SQLiteDatabase) {
@@ -238,6 +262,7 @@ class Db private constructor(ctx: Context) : SQLiteOpenHelper(ctx, "rutas.db", n
         startAddr = stringOrNull("start_addr"),
         endAddr = stringOrNull("end_addr"),
         note = stringOrNull("note"),
+        source = stringOrNull("source") ?: Trip.SOURCE_LIVE,
     )
 
     private fun Cursor.long(col: String) = getLong(getColumnIndexOrThrow(col))

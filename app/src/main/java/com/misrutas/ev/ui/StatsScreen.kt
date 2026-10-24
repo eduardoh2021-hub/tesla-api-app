@@ -88,7 +88,9 @@ fun StatsScreen() {
                 }
                 Row(Modifier.fillMaxWidth()) {
                     Metric("Tiempo al volante", Fmt.duration((hours * 3_600_000).toLong()), Modifier.weight(1f))
-                    Metric("Velocidad media", "${Fmt.dec(if (hours > 0) km / hours else 0.0)} km/h", Modifier.weight(1f))
+                    // Las rutas del modo respaldo no tienen duración: solo cuentan las detalladas.
+                    val detailedKm = trips.filter { it.detailed }.sumOf { it.distanceKm }
+                    Metric("Velocidad media", "${Fmt.dec(if (hours > 0) detailedKm / hours else 0.0)} km/h", Modifier.weight(1f))
                 }
                 Row(Modifier.fillMaxWidth()) {
                     Metric("Consumo medio", trips.kwhPer100()?.let { "${Fmt.dec(it)} kWh/100 km" } ?: "—", Modifier.weight(1f))
@@ -140,7 +142,7 @@ fun StatsScreen() {
             }
 
             val bands = listOf(0.0 to 30.0, 30.0 to 60.0, 60.0 to 90.0, 90.0 to 110.0, 110.0 to 999.0)
-            val bandValues = bands.map { (lo, hi) -> trips.filter { it.avgSpeed >= lo && it.avgSpeed < hi }.kwhPer100() ?: 0.0 }
+            val bandValues = bands.map { (lo, hi) -> trips.filter { it.detailed && it.avgSpeed >= lo && it.avgSpeed < hi }.kwhPer100() ?: 0.0 }
             if (bandValues.count { it > 0 } >= 2) {
                 SectionCard("Consumo según velocidad media (kWh/100 km)") {
                     BarChart(

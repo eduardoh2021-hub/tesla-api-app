@@ -30,6 +30,26 @@ costaría más de eso, así que la app usa el **Bluetooth del coche** como dispa
 - La ruta empieza con la primera lectura en marcha (D/R/N) y termina al aparcar 5 min o al desconectarse el Bluetooth.
 - Con una hora diaria de conducción salen unas 1.800 lecturas al mes ≈ 3,6 $, dentro del crédito gratuito.
 
+### Modo respaldo (rutas sin el móvil)
+
+Si conduces sin el móvil, o MagicOS cierra la app, esos km no se pierden:
+
+- **Cada 24 h**, solo si en las últimas 24 h no ha habido conexión Bluetooth con el coche, la app consulta
+  `vehicle_data_cached` (la última lectura que el coche envió a Tesla; **nunca lo despierta**).
+- Al **empezar cada sesión** de registro también se compara con la última lectura conocida.
+- Si el cuentakilómetros ha avanzado ≥ 1 km, se guarda una **ruta no detallada** con los km y el consumo
+  (autonomía perdida + kWh cargados entre medias). No tiene hora exacta ni velocidad, y puede agrupar varios trayectos;
+  el consumo incluye lo que gastó el coche aparcado. Cuesta 1 lectura al día (≈ 0,06 $/mes).
+
+Se activa o desactiva en *Ajustes › 8 · Modo respaldo*, donde también se puede lanzar una comprobación al momento.
+
+### Actualizaciones desde la app
+
+*Ajustes › 9 · Actualizaciones › Buscar actualización* consulta la última *Release* de este repositorio. Si su etiqueta
+(p. ej. `v1.2`) es más nueva que la versión instalada, descarga el APK y abre el instalador de Android para confirmar.
+La primera vez Android pide permitir que *Mis Rutas EV* instale apps. Para publicar una versión basta con crear una
+Release con una etiqueta `vX.Y`: GitHub Actions compila el APK firmado y lo adjunta.
+
 ### Cálculos
 
 | Dato | Cómo se calcula |

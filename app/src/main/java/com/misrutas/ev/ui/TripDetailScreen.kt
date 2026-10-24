@@ -92,14 +92,25 @@ fun TripDetailScreen(id: Long, onBack: () -> Unit) {
         } else {
             SectionCard("Resumen", Modifier.padding(top = 12.dp)) {
                 val price = prefs.pricePerKwh.toDouble()
+                if (!t.detailed) {
+                    Text(
+                        "Detectada por el modo respaldo entre ${Fmt.dateTime(t.startTs)} y ${Fmt.dateTime(t.endTs)}. " +
+                            "Puede agrupar varios trayectos; el consumo incluye lo que gastó el coche aparcado en ese tiempo.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
                 MetricRow(
                     "Distancia" to Fmt.km(t.distanceKm),
-                    "Duración" to Fmt.duration(t.endTs - t.startTs),
+                    "Duración" to if (t.detailed) Fmt.duration(t.endTs - t.startTs) else "—",
                 )
-                MetricRow(
-                    "Velocidad media" to "${Fmt.dec(t.avgSpeed)} km/h",
-                    "Velocidad máxima" to "${t.maxSpeed.toInt()} km/h",
-                )
+                if (t.detailed) {
+                    MetricRow(
+                        "Velocidad media" to "${Fmt.dec(t.avgSpeed)} km/h",
+                        "Velocidad máxima" to "${t.maxSpeed.toInt()} km/h",
+                    )
+                }
                 MetricRow(
                     "Consumo" to (t.kwhPer100?.let { "${Fmt.dec(it)} kWh/100 km" } ?: "—"),
                     "Energía" to Fmt.kwh(t.energyKwh),
@@ -110,7 +121,7 @@ fun TripDetailScreen(id: Long, onBack: () -> Unit) {
                 )
                 MetricRow(
                     "Temp. exterior" to (t.avgTemp?.let { "${Fmt.dec(it)} °C" } ?: "—"),
-                    "Hora" to "${Fmt.time(t.startTs)} – ${Fmt.time(t.endTs)}",
+                    "Hora" to if (t.detailed) "${Fmt.time(t.startTs)} – ${Fmt.time(t.endTs)}" else "—",
                 )
             }
         }

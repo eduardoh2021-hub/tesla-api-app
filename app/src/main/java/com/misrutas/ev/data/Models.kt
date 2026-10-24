@@ -62,15 +62,20 @@ data class Trip(
     val startAddr: String?,
     val endAddr: String?,
     val note: String?,
+    val source: String = SOURCE_LIVE,
 ) {
     val recording get() = status == STATUS_RECORDING
-    val hours get() = (endTs - startTs) / 3_600_000.0
+    /** false para las rutas del modo respaldo: se conocen km y consumo, pero no la hora ni la velocidad. */
+    val detailed get() = source != SOURCE_BACKUP
+    val hours get() = if (detailed) (endTs - startTs) / 3_600_000.0 else 0.0
     val avgSpeed get() = if (hours > 0.005) distanceKm / hours else 0.0
     val kwhPer100: Double? get() = if (distanceKm >= 0.5) energyKwh / distanceKm * 100 else null
 
     companion object {
         const val STATUS_RECORDING = "recording"
         const val STATUS_DONE = "done"
+        const val SOURCE_LIVE = "live"
+        const val SOURCE_BACKUP = "backup"
     }
 }
 

@@ -3,6 +3,7 @@ package com.misrutas.ev
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import com.misrutas.ev.trip.Backup
 
 class App : Application() {
     override fun onCreate() {
@@ -14,6 +15,7 @@ class App : Application() {
         nm.createNotificationChannel(
             NotificationChannel(CH_ALERTS, "Avisos", NotificationManager.IMPORTANCE_DEFAULT)
         )
+        Backup.schedule(this)
     }
 
     companion object {

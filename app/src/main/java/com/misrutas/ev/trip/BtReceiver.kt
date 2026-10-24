@@ -15,7 +15,10 @@ class BtReceiver : BroadcastReceiver() {
         val device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java) ?: return
         if (!device.address.equals(target, ignoreCase = true)) return
         when (intent.action) {
-            BluetoothDevice.ACTION_ACL_CONNECTED -> TripService.send(ctx, TripService.ACTION_BT_CONNECTED)
+            BluetoothDevice.ACTION_ACL_CONNECTED -> {
+                prefs.lastConnectTs = System.currentTimeMillis()
+                TripService.send(ctx, TripService.ACTION_BT_CONNECTED)
+            }
             BluetoothDevice.ACTION_ACL_DISCONNECTED ->
                 if (TripService.running.value) TripService.send(ctx, TripService.ACTION_BT_GONE)
         }

@@ -113,13 +113,17 @@ class TripService : Service() {
         var lastOk = startedAt
         var lastActivity = startedAt
         var last: Snapshot? = null
+        prefs.lastConnectTs = startedAt
 
         while (!stopRequested) {
             var unavailable = false
             try {
                 val s = client.vehicleData()
+                // La primera lectura de la sesión rellena los km hechos sin la app; las siguientes solo marcan referencia.
+                if (last == null) Backup.fillGap(this, s) else Backup.markSeen(this, s)
                 last = s
                 lastOk = System.currentTimeMillis()
+                prefs.lastConnectTs = lastOk
                 rec.onSnapshot(s)
                 battery.observe(s)
                 if (s.isDriving || rec.openTripId != null) lastActivity = lastOk
