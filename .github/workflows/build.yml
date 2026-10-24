@@ -43,6 +43,10 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
           cp app/build/outputs/apk/release/app-release.apk MisRutasEV.apk
+          # Huella del certificado visible en el resumen de la ejecución, para comprobar que firma con tu clave.
+          APKSIGNER="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner"
+          SHA=$("$APKSIGNER" verify --print-certs MisRutasEV.apk | grep -m1 'SHA-256' | awk '{print $NF}')
+          echo "::notice::Firma SHA-256 del APK: $SHA"
 
       - name: Guardar el APK
         uses: actions/upload-artifact@v4
